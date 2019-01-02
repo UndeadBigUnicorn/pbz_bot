@@ -1,21 +1,59 @@
 import telebot
 import constants
 import cherrypy
+import os
 from telebot import types
 
+TOKEN = os.environ['TOKEN']
 adminId = constants.adminId
 channelId = constants.channelId
+bot = telebot.TeleBot(TOKEN)
 
-WEBHOOK_HOST = 'localhost'  # 'IP-адрес сервера, на котором запущен бот'
-WEBHOOK_PORT = 80  # 443, 80, 88 или 8443 (порт должен быть открыт!)
+WEBHOOK_HOST = 'https://pbzbot.herokuapp.com'
+WEBHOOK_PORT = 443  # 443, 80, 88 или 8443 (порт должен быть открыт!)
 WEBHOOK_LISTEN = '0.0.0.0'  # На некоторых серверах придется указывать такой же IP, что и выше
 
-WEBHOOK_SSL_CERT = './webhook_cert.pem'  # Путь к сертификату
-WEBHOOK_SSL_PRIV = './webhook_pkey.pem'  # Путь к приватному ключу
 
 WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
-WEBHOOK_URL_PATH = "/%s/" % (config.TOKEN)
-bot = telebot.TeleBot(constants.token)
+WEBHOOK_URL_PATH = "/%s/" % (TOKEN)
+
+
+class WebhookServer(object):
+    @cherrypy.expose
+    def index(self):
+        if 'content-length' in cherrypy.request.headers and \
+                'content-type' in cherrypy.request.headers and \
+                cherrypy.request.headers['content-type'] == 'application/json':
+            length = int(cherrypy.request.headers['content-length'])
+            json_string = cherrypy.request.body.read(length).decode("utf-8")
+            update = telebot.types.Update.de_json(json_string)
+            # Эта функция обеспечивает проверку входящего сообщения
+            bot.process_new_updates([update])
+            return ''
+        else:
+            raise cherrypy.HTTPError(403)
+
+
+bot.remove_webhook()
+
+# Ставим заново вебхук
+bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH)
+
+# Указываем настройки сервера CherryPy
+cherrypy.config.update({
+    'server.socket_host': WEBHOOK_LISTEN,
+    'server.socket_port': WEBHOOK_PORT,
+    'server.ssl_module': 'builtin'
+})
+
+
+
+WEBHOOK_HOST = 'https://pbzbot.herokuapp.com'  # name your app
+WEBHOOK_PATH = '/webhook/'
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
+
+WEBAPP_HOST = '0.0.0.0'
+WEBAPP_PORT = os.environ.get('PORT')
 
 
 @bot.message_handler(commands=['start'])
@@ -23,6 +61,7 @@ def handle_start(message):
     bot.send_message(message.from_user.id, """Этот бот позволяет отправлять контент админам канала Приматы без фильтра.\n
 Для отправки сообщения используйте команду:\n
 `/send`\n""")
+
 
 @bot.message_handler(commands=['help'])
 def handle_help(message):
@@ -106,16 +145,22 @@ def callback_inline(call):  # в call можно еще смотреть, кто
                 del photo_messages[call.message.photo[0].file_id]
             else:
                 bot.send_message(channelId, call.message.text)
-                bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Отправлено")
+                bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                      text="Отправлено")
             # Уведомление в верхней части экрана
             bot.answer_callback_query(callback_query_id=call.id, show_alert=False, text="Сообщение отправлено на канал")
         if call.data == "abort":
             if call.message.photo:
-                bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption="Отменено")
+                bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                         caption="Отменено")
                 del photo_messages[call.message.photo[0].file_id]
             else:
                 bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Отменено")
             bot.answer_callback_query(callback_query_id=call.id, show_alert=True, text="Сообщение отменено")
 
 
-bot.polling(none_stop=True, interval=0)
+#bot.polling(none_stop=True, interval=0)
+
+if __name__ == '__main__':
+    # Собственно, запуск!
+    cherrypy.quickstart(WebhookServer(), WEBHOOK_URL_PATH, {'/': {}})
