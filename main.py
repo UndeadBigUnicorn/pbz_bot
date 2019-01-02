@@ -4,7 +4,7 @@ import cherrypy
 import os
 from telebot import types
 
-TOKEN = '767071108:AAHUSuhCilfvhf8dqeykDcpQhFTtmhaEs4c'#os.environ['TOKEN']
+TOKEN = constants.token #os.environ['TOKEN']
 adminId = constants.adminId
 channelId = constants.channelId
 bot = telebot.TeleBot(TOKEN)
