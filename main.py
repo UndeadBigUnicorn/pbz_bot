@@ -47,14 +47,14 @@ cherrypy.config.update({
 })
 
 
-
+"""
 WEBHOOK_HOST = 'https://pbzbot.herokuapp.com'  # name your app
 WEBHOOK_PATH = '/webhook/'
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
 WEBAPP_HOST = '0.0.0.0'
 WEBAPP_PORT = os.environ.get('PORT')
-
+"""
 
 @bot.message_handler(commands=['start'])
 def handle_start(message):
