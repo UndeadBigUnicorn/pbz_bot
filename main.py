@@ -9,6 +9,7 @@ adminId = constants.adminId
 channelId = constants.channelId
 bot = telebot.TeleBot(TOKEN)
 
+"""
 WEBHOOK_HOST = 'https://pbzbot.herokuapp.com'
 WEBHOOK_PORT = 443  # 443, 80, 88 или 8443 (порт должен быть открыт!)
 WEBHOOK_LISTEN = '0.0.0.0'  # На некоторых серверах придется указывать такой же IP, что и выше
@@ -45,7 +46,7 @@ cherrypy.config.update({
     'server.socket_port': WEBHOOK_PORT,
     'server.ssl_module': 'builtin'
 })
-
+"""
 
 """
 WEBHOOK_HOST = 'https://pbzbot.herokuapp.com'  # name your app
@@ -159,8 +160,9 @@ def callback_inline(call):  # в call можно еще смотреть, кто
             bot.answer_callback_query(callback_query_id=call.id, show_alert=True, text="Сообщение отменено")
 
 
-#bot.polling(none_stop=True, interval=0)
+
 
 if __name__ == '__main__':
     # Собственно, запуск!
-    cherrypy.quickstart(WebhookServer(), WEBHOOK_URL_PATH, {'/': {}})
+    bot.polling(none_stop=True, interval=0)
+    #cherrypy.quickstart(WebhookServer(), WEBHOOK_URL_PATH, {'/': {}})
