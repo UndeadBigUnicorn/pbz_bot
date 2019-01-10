@@ -14,4 +14,4 @@ Telegram bot using PyTelegramBotApi for chanel t.me/filtern_t
 Бот не будет реагировать на остальные сообщения.
 
 # /help
-По всем вопросам по работе бота, рекламе и создании своего бота к <a href="t.me/UndeadBigUnicorn">автору</a>
+По всем вопросам по работе бота, рекламе и создании своего бота к <a href="http://t.me/UndeadBigUnicorn">автору</a>
