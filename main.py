@@ -1,61 +1,56 @@
 import telebot
 import constants
-import cherrypy
-import os
 from telebot import types
+from flask import Flask, request
+import sqlalchemy as db
+import os
 
-TOKEN = constants.token #os.environ['TOKEN']
+basedir = os.path.abspath(os.path.dirname(__file__))
+
+SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'photodb.sqlite?check_same_thread=False')
+SQLALCHEMY_MIGRATE_REPO = os.path.join(basedir, 'db_repository')
+engine = db.create_engine(SQLALCHEMY_DATABASE_URI)  # check_same_thread=False)  # Create test.sqlite automatically
+connection = engine.connect()
+metadata = db.MetaData()
+# photos2 = db.Table('photos', metadata, autoload=True, autoload_with=engine)
+# photos2.drop(engine)
+photos = db.Table('photos', metadata,
+                  db.Column('id', db.Integer(), primary_key=True),  # nullable=False, autoincrement=True),
+                  db.Column('file_id', db.String(255), nullable=False)
+                  )
+
+metadata.create_all(engine)  # Creates the table
+
+TOKEN = constants.token
 adminId = constants.adminId
 channelId = constants.channelId
-bot = telebot.TeleBot(TOKEN)
 
-"""
-WEBHOOK_HOST = 'https://pbzbot.herokuapp.com'
-WEBHOOK_PORT = 443  # 443, 80, 88 или 8443 (порт должен быть открыт!)
-WEBHOOK_LISTEN = '0.0.0.0'  # На некоторых серверах придется указывать такой же IP, что и выше
+# secret = "285ufh4uqgf94"
+url = "https://kravchel17.pythonanywhere.com/"  # + secret
 
-
-WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
-WEBHOOK_URL_PATH = "/%s/" % (TOKEN)
-
-
-class WebhookServer(object):
-    @cherrypy.expose
-    def index(self):
-        if 'content-length' in cherrypy.request.headers and \
-                'content-type' in cherrypy.request.headers and \
-                cherrypy.request.headers['content-type'] == 'application/json':
-            length = int(cherrypy.request.headers['content-length'])
-            json_string = cherrypy.request.body.read(length).decode("utf-8")
-            update = telebot.types.Update.de_json(json_string)
-            # Эта функция обеспечивает проверку входящего сообщения
-            bot.process_new_updates([update])
-            return ''
-        else:
-            raise cherrypy.HTTPError(403)
-
-
+bot = telebot.TeleBot(TOKEN, threaded=False)
 bot.remove_webhook()
+bot.set_webhook(url=url)
 
-# Ставим заново вебхук
-bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH)
+app = Flask(__name__)
 
-# Указываем настройки сервера CherryPy
-cherrypy.config.update({
-    'server.socket_host': WEBHOOK_LISTEN,
-    'server.socket_port': WEBHOOK_PORT,
-    'server.ssl_module': 'builtin'
-})
-"""
+user_keyboard = types.InlineKeyboardMarkup(row_width=1)
+url_button = types.InlineKeyboardButton(text="Перейти в лучший канал с мемами", url="https://t.me/filtern_t")
+user_keyboard.add(url_button)
 
-"""
-WEBHOOK_HOST = 'https://pbzbot.herokuapp.com'  # name your app
-WEBHOOK_PATH = '/webhook/'
-WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
+keyboard = types.InlineKeyboardMarkup(row_width=2)
+confirm_button = types.InlineKeyboardButton(text="Confrim", callback_data="confirm")
+abort_button = types.InlineKeyboardButton(text="Abort", callback_data="abort")
+keyboard.add(confirm_button, abort_button)
 
-WEBAPP_HOST = '0.0.0.0'
-WEBAPP_PORT = os.environ.get('PORT')
-"""
+
+@app.route('/', methods=['POST', 'GET'])  # + secret, methods=['POST', 'GET'])
+def webhook():
+    if request.method == 'POST':
+        update = telebot.types.Update.de_json(request.stream.read().decode('utf-8'))
+        bot.process_new_updates([update])
+        return 'ok', 200
+
 
 @bot.message_handler(commands=['start'])
 def handle_start(message):
@@ -90,17 +85,10 @@ def handle_text(message):
         addMode.remove(message.from_user.id)
         return
 
-    user_keyboard = types.InlineKeyboardMarkup(row_width=1)
-    url_button = types.InlineKeyboardButton(text="Перейти в лучший чат с мемами", url="https://t.me/filtern_t")
-    user_keyboard.add(url_button)
     bot.send_message(message.from_user.id, 'Ваше сообщение отправлено админам', reply_markup=user_keyboard)
 
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    confirm_button = types.InlineKeyboardButton(text="Confrim", callback_data="confirm")
-    abort_button = types.InlineKeyboardButton(text="Abort", callback_data="abort")
-    keyboard.add(confirm_button, abort_button)
-
-    bot.send_message(adminId, message.text + ' Прислал ' + message.from_user.username + ' через бота',
+    bot.send_message(adminId,
+                     message.text + ' Прислал ' + message.from_user.username if not None else message.from_user.first_name + ' через @filtern_t_bot',
                      reply_markup=keyboard)
 
     addMode.remove(message.from_user.id)
@@ -116,53 +104,157 @@ def handle_photo(message):
         addMode.remove(message.from_user.id)
         return
 
-    user_keyboard = types.InlineKeyboardMarkup(row_width=1)
-    url_button = types.InlineKeyboardButton(text="Перейти в лучший чат с мемами", url="https://t.me/filtern_t")
-    user_keyboard.add(url_button)
-    bot.send_message(message.from_user.id, 'Ваша картинка отправлено админам', reply_markup=user_keyboard)
-
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    confirm_button = types.InlineKeyboardButton(text="Confrim", callback_data="confirm")
-    abort_button = types.InlineKeyboardButton(text="Abort", callback_data="abort")
-    keyboard.add(confirm_button, abort_button)
+    bot.send_message(message.from_user.id, 'Ваша картинка отправлена админам', reply_markup=user_keyboard)
 
     bot.send_photo(adminId, message.photo[0].file_id,
-                   caption='Прислал {} через бота'.format(message.from_user.username), reply_markup=keyboard)
+                   caption='Прислал {} через @filtern_t_bot'.format(
+                       message.from_user.username if not None else message.from_user.first_name), reply_markup=keyboard)
 
-    photo_messages[message.photo[0].file_id] = message.from_user.username
+    photo_messages[message.photo[0].file_id] = message.from_user.username if not None else message.from_user.first_name
+
+    addMode.remove(message.from_user.id)
+
+
+video_messages = {}
+
+
+@bot.message_handler(content_types=['video'])
+def handle_video(message):
+    chatId = message.chat.id
+    if (chatId not in addMode):
+        return
+
+    if (message.text is not None and message.text.lower() == "/cancel"):
+        addMode.remove(message.from_user.id)
+        return
+
+    bot.send_message(message.from_user.id, 'Ваше видео отправлена админам', reply_markup=user_keyboard)
+
+    bot.send_video(adminId, message.video.file_id,
+                   caption='Прислал {} через @filtern_t_bot'.format(
+                       message.from_user.username if not None else message.from_user.first_name), reply_markup=keyboard)
+
+    video_messages[message.video.file_id] = message.from_user.username if not None else message.from_user.first_name
+
+    addMode.remove(message.from_user.id)
+
+
+sticker_messages = {}
+
+
+@bot.message_handler(content_types=['sticker'])
+def handle_sticker(message):
+    print(message)
+    chatId = message.chat.id
+    if (chatId not in addMode):
+        return
+
+    if (message.text is not None and message.text.lower() == "/cancel"):
+        addMode.remove(message.from_user.id)
+        return
+
+    bot.send_message(message.from_user.id, 'Ваш стикер отправлен админам', reply_markup=user_keyboard)
+
+    bot.send_sticker(adminId, message.sticker.file_id, reply_markup=keyboard)
+
+    sticker_messages[message.sticker.file_id] = message.from_user.username if not None else message.from_user.first_name
+
+    addMode.remove(message.from_user.id)
+
+
+gif_messages = {}
+
+
+@bot.message_handler(content_types=['document'])
+def handle_gif(message):
+    chatId = message.chat.id
+    if (chatId not in addMode):
+        return
+
+    if (message.text is not None and message.text.lower() == "/cancel"):
+        addMode.remove(message.from_user.id)
+        return
+
+    bot.send_message(message.from_user.id, 'Ваша гифка отправлена админам', reply_markup=user_keyboard)
+
+    bot.send_document(adminId, message.document.file_id, caption='Прислал {} через @filtern_t_bot'.format(
+        message.from_user.username if not None else message.from_user.first_name), reply_markup=keyboard)
+
+    gif_messages[message.document.file_id] = message.from_user.username if not None else message.from_user.first_name
 
     addMode.remove(message.from_user.id)
 
 
 @bot.callback_query_handler(func=lambda call: True)
-def callback_inline(call):  # в call можно еще смотреть, кто нажал
+def callback_inline(call):
     if call.message:
         if call.data == "confirm":
             if call.message.photo:
                 bot.send_photo(channelId, call.message.photo[0].file_id,
-                               caption='Прислал {} через бота'.format(photo_messages[call.message.photo[0].file_id]))
+                               caption='Прислал {} через @filtern_t_bot'.format(
+                                   photo_messages[call.message.photo[0].file_id]))
                 bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                         caption="Отправлено")
+                                         caption="Отправлено @{}".format(call.from_user.username))
+                query = db.insert(photos).values(file_id=call.message.photo[0].file_id)
+                ResultProxy = connection.execute(query)
                 del photo_messages[call.message.photo[0].file_id]
+            elif call.message.video:
+                bot.send_video(channelId, call.message.video.file_id,
+                               caption='Прислал {} через @filtern_t_bot'.format(
+                                   video_messages[call.message.video.file_id]))
+                bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                         caption="Отправлено @{}".format(call.from_user.username))
+                del video_messages[call.message.video.file_id]
+            elif call.message.sticker:
+                bot.send_sticker(channelId, call.message.sticker.file_id)
+                bot.send_message(channelId,
+                                 'Прислал {} через @filtern_t_bot'.format(
+                                     sticker_messages[call.message.sticker.file_id]))
+                del sticker_messages[call.message.sticker.file_id]
+            elif call.message.document:
+                bot.send_document(channelId, call.message.document.file_id,
+                                  caption='Прислал {} через @filtern_t_bot'.format(
+                                      gif_messages[call.message.document.file_id]))
+                bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                         caption="Отправлено @{}".format(call.from_user.username))
+                del gif_messages[call.message.document.file_id]
             else:
                 bot.send_message(channelId, call.message.text)
                 bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                       text="Отправлено")
             # Уведомление в верхней части экрана
             bot.answer_callback_query(callback_query_id=call.id, show_alert=False, text="Сообщение отправлено на канал")
+
         if call.data == "abort":
             if call.message.photo:
                 bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                         caption="Отменено")
+                                         caption="Отменено @{}".format(call.from_user.username))
                 del photo_messages[call.message.photo[0].file_id]
+            elif call.message.video:
+                bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                         caption="Отменено @{}".format(call.from_user.username))
+                del video_messages[call.message.video.file_id]
+            elif call.message.sticker:
+                del sticker_messages[call.message.sticker.file_id]
+            elif call.message.document:
+                bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                         caption="Отменено @{}".format(call.from_user.username))
+                del gif_messages[call.message.document.file_id]
             else:
-                bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Отменено")
+                bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                      text="Отменено @{}".format(call.from_user.username))
             bot.answer_callback_query(callback_query_id=call.id, show_alert=True, text="Сообщение отменено")
 
 
-
-
-if __name__ == '__main__':
-    # Собственно, запуск!
-    bot.polling(none_stop=True, interval=0)
-    #cherrypy.quickstart(WebhookServer(), WEBHOOK_URL_PATH, {'/': {}})
+@bot.inline_handler(lambda query: len(query.query) >= 0)
+def empty_query(query):
+    try:
+        array = []
+        query_sql = db.select([photos])
+        ResultProxy = connection.execute(query_sql)
+        ResultSet = ResultProxy.fetchall()  # Result of query
+        for i in ResultSet:
+            array.append(types.InlineQueryResultCachedPhoto(id=i.id, photo_file_id=i.file_id, parse_mode='Markdown'))
+        bot.answer_inline_query(query.id, array, cache_time=2)
+    except Exception as e:
+        print(e)
