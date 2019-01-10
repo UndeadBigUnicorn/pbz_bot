@@ -56,12 +56,15 @@ def webhook():
 def handle_start(message):
     bot.send_message(message.from_user.id, """Этот бот позволяет отправлять контент админам канала Приматы без фильтра.\n
 Для отправки сообщения используйте команду:\n
-`/send`\n""")
+`/send`\n
+Для просмотра дополнительной ифнормации используйте команду:\n
+`/help`\n""")
 
 
 @bot.message_handler(commands=['help'])
 def handle_help(message):
-    bot.send_message(message.from_user.id, "По всем вопросам писать @UndeadBigUnicorn")
+    bot.send_message(message.from_user.id,
+                     "По вопросам работы бота, рекламы и создании совего бота на заказ писать @UndeadBigUnicorn")
 
 
 addMode = []
@@ -70,7 +73,7 @@ photo_messages = {}
 
 @bot.message_handler(commands=['send'])
 def handle_send(message):
-    text = 'Теперь пришлите ваше сообщение. Или /cancel для отмены операции.'
+    text = 'Теперь пришлите ваше сообщение. Всю информации, что вы хотите отправить админам нужно уместить в одно сообщение. \n Если это фотография, то текст нужно поместить в подпись к изображению. Бот в диалоге с вами будет реагировать только на одно сообщение. \n Для отмены операции нажмите `/cancel` .'
     addMode.append(message.from_user.id)
     bot.send_message(message.from_user.id, text);
 
